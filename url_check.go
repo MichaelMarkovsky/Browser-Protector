@@ -13,7 +13,7 @@ import (
 
 func main() {
 
-	URL := "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSMD8qCrtyprMTaONWq2gaQxyXr7fR4WKUW1Q&s"
+	URL := "https://github.com/MichaelMarkovsky/Browser-Protector/archive/refs/heads/dev/url_check.zip"
 
 	// err - stores any error
 	// resp - the response of the get request
@@ -52,17 +52,23 @@ func main() {
 		fmt.Println("filename:", filename)
 	}
 
-	// Create output file
-	out, err := os.Create(filename)
-	if err != nil {
-		log.Fatal("File creation failed:", err)
-	}
-	defer out.Close()
+	//If we found a name for the file then create and download the file
+	if filename != "" {
+		// Create output file
+		out, err := os.Create(filename)
+		if err != nil {
+			log.Fatal("File creation failed:", err)
+		}
+		defer out.Close()
 
-	// Copy response body to file
-	n, err := io.Copy(out, resp.Body)
-	if err != nil {
-		log.Fatal("Copy failed:", err)
+		// Copy response body to file
+		n, err := io.Copy(out, resp.Body)
+		if err != nil {
+			log.Fatal("Copy failed:", err)
+		}
+		fmt.Printf("Downloaded %d bytes\n", n)
+	} else {
+		log.Fatal("File name has not been located, download failed.")
 	}
-	fmt.Printf("Downloaded %d bytes\n", n)
+
 }
