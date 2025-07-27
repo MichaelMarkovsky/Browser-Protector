@@ -1,7 +1,6 @@
 package main
 
 import (
-	"archive/zip"
 	"fmt"
 	"io"
 	"log"
@@ -11,6 +10,8 @@ import (
 	"os"
 	"path"
 	"strings"
+
+	"github.com/gen2brain/go-unarr"
 )
 
 func main() {
@@ -35,10 +36,14 @@ func main() {
 	contentType := resp.Header.Get("Content-Type")
 	fmt.Println("Content-Type:", contentType)
 
-	IsZip := false
-	if strings.Contains(contentType, "zip") {
-		IsZip = true
-		fmt.Println("Zip file found.")
+	compressedTypes := []string{"zip", "rar", "tar", "7z"}
+	IsCompressed := false
+	for _, t := range compressedTypes {
+		if strings.Contains(contentType, t) {
+			IsCompressed = true
+			fmt.Println("Compressed file found.")
+			break
+		}
 	}
 
 	// Get the file name
@@ -80,49 +85,18 @@ func main() {
 	}
 
 	// If the file is of zip type then unzip (if its compressed then uncompress)
-	if IsZip {
+	if IsCompressed {
 
-		// Open a zip archive for reading.
-		r, err := zip.OpenReader(filename)
+		a, err := unarr.NewArchive(filename)
 		if err != nil {
-			log.Fatalf("impossible to open zip reader: %s", err)
+			panic(err)
 		}
-		defer r.Close()
+		defer a.Close()
 
-		// Iterate through the files in the archive,
-		for k, f := range r.File {
-			fmt.Printf("Unzipping %s:\n", f.Name)
-			rc, err := f.Open()
-			if err != nil {
-				log.Fatalf("impossible to open file n°%d in archine: %s", k, err)
-			}
-			defer rc.Close()
-			// define the new file path
-			newFilePath := fmt.Sprintf("uncompressed/%s", f.Name)
-
-			// CASE 1 : we have a directory
-			if f.FileInfo().IsDir() {
-				// if we have a directory we have to create it
-				err = os.MkdirAll(newFilePath, 0777)
-				if err != nil {
-					log.Fatalf("impossible to MkdirAll: %s", err)
-				}
-				// we can go to next iteration
-				continue
-			}
-
-			// CASE 2 : we have a file
-			// create new uncompressed file
-			uncompressedFile, err := os.Create(newFilePath)
-			if err != nil {
-				log.Fatalf("impossible to create uncompressed: %s", err)
-			}
-			_, err = io.Copy(uncompressedFile, rc)
-			if err != nil {
-				log.Fatalf("impossible to copy file n°%d: %s", k, err)
-			}
+		_, err = a.Extract("./")
+		if err != nil {
+			panic(err)
 		}
-
 	}
 
 }
