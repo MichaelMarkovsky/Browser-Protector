@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -29,6 +30,18 @@ func goDotEnvVariable(key string) string {
 	}
 
 	return os.Getenv(key)
+}
+
+type Object struct {
+	Data Data `json:"data"`
+}
+
+type Data struct {
+	ID    string `json:"id"`
+	Links Links  `json:"links"`
+}
+type Links struct {
+	Self string `json:"self"`
 }
 
 func main() {
@@ -119,7 +132,7 @@ func main() {
 	// godotenv package
 	API_KEY := goDotEnvVariable("API_KEY")
 
-	// SEND FILE TO VIRUS TOTAL
+	//===================================== SEND FILE TO VIRUS TOTAL =====================================
 	Vurl := "https://www.virustotal.com/api/v3/files"
 
 	fileBytes, err := os.ReadFile(filename)
@@ -150,7 +163,45 @@ func main() {
 	Vres, _ := http.DefaultClient.Do(Vreq)
 
 	defer Vres.Body.Close()
-	body, _ := io.ReadAll(Vres.Body)
+	// Read the full body into memory
+	body, err := io.ReadAll(Vres.Body)
+	if err != nil {
+		panic(err)
+	}
+	// Print the raw body
 	fmt.Println(string(body))
+
+	// Decode the JSON from the body bytes and get id
+	var obj Object
+	if err := json.Unmarshal(body, &obj); err != nil {
+		panic(err)
+	}
+
+	url_id := obj.Data.Links.Self
+	fmt.Println("Analysis url id: " + url_id)
+
+	//=====================================GET Virus Total analysis on the file/folder=====================================
+
+	req_p, err := http.NewRequest("GET", url_id, nil)
+	if err != nil {
+		panic(err)
+	}
+
+	req_p.Header.Add("accept", "application/json")
+	req_p.Header.Add("x-apikey", API_KEY)
+
+	res_p, err := http.DefaultClient.Do(req_p)
+	if err != nil {
+		panic(err)
+	}
+
+	defer res_p.Body.Close()
+
+	body_res, err := io.ReadAll(res_p.Body)
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println(string(body_res))
 
 }
