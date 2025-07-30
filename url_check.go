@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"fmt"
 	"io"
 	"log"
@@ -11,8 +12,24 @@ import (
 	"path"
 	"strings"
 
+	"github.com/joho/godotenv"
+
 	"github.com/gen2brain/go-unarr"
 )
+
+// use godot package to load/read the .env file and
+// return the value of the key
+func goDotEnvVariable(key string) string {
+
+	// load .env file
+	err := godotenv.Load(".env")
+
+	if err != nil {
+		log.Fatalf("Error loading .env file")
+	}
+
+	return os.Getenv(key)
+}
 
 func main() {
 
@@ -98,5 +115,42 @@ func main() {
 			panic(err)
 		}
 	}
+
+	// godotenv package
+	API_KEY := goDotEnvVariable("API_KEY")
+
+	// SEND FILE TO VIRUS TOTAL
+	Vurl := "https://www.virustotal.com/api/v3/files"
+
+	fileBytes, err := os.ReadFile(filename)
+	if err != nil {
+		panic(err)
+	}
+
+	// Encode file to base64
+	fileBase64 := base64.StdEncoding.EncodeToString(fileBytes)
+
+	// Define boundary
+	boundary := "-----011000010111000001101001"
+
+	// Create multipart form body as string
+	payloadStr := fmt.Sprintf(
+		"%s\r\nContent-Disposition: form-data; name=\"file\"; filename=\"%s\"\r\nContent-Type: %s\r\n\r\n"+
+			"data:%s;name=%s;base64,%s\r\n%s--",
+		boundary, filename, contentType, contentType, filename, fileBase64, boundary)
+
+	payload := strings.NewReader(payloadStr)
+
+	Vreq, _ := http.NewRequest("POST", Vurl, payload)
+
+	Vreq.Header.Add("accept", "application/json")
+	Vreq.Header.Add("x-apikey", API_KEY)
+	Vreq.Header.Add("content-type", "multipart/form-data; boundary=---011000010111000001101001")
+
+	Vres, _ := http.DefaultClient.Do(Vreq)
+
+	defer Vres.Body.Close()
+	body, _ := io.ReadAll(Vres.Body)
+	fmt.Println(string(body))
 
 }
