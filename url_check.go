@@ -12,6 +12,7 @@ import (
 	"os"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/joho/godotenv"
 
@@ -39,14 +40,19 @@ type Object struct {
 type Data struct {
 	ID    string `json:"id"`
 	Links Links  `json:"links"`
+	Stats Stats  `json:"stats"`
 }
 type Links struct {
 	Self string `json:"self"`
 }
+type Stats struct {
+	Malicious  int `json:"malicious"`
+	Suspicious int `json:"suspicious"`
+}
 
 func main() {
 
-	URL := "https://github.com/MichaelMarkovsky/Browser-Protector/archive/refs/heads/dev/url_check.zip"
+	URL := "https://images.pexels.com/photos/18810025/pexels-photo-18810025.jpeg?cs=srgb&dl=pexels-aleksandra-s-282932122-18810025.jpg&fm=jpg&w=4000&h=6000&_gl=1*8cago4*_ga*OTg5MTIzOTIuMTc1Mzk2NzY2Nw..*_ga_8JE65Q40S6*czE3NTM5Njc2NjckbzEkZzEkdDE3NTM5Njc2NjgkajU5JGwwJGgw"
 
 	// err - stores any error
 	// resp - the response of the get request
@@ -127,6 +133,7 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
+
 	}
 
 	// godotenv package
@@ -160,7 +167,12 @@ func main() {
 	Vreq.Header.Add("x-apikey", API_KEY)
 	Vreq.Header.Add("content-type", "multipart/form-data; boundary=---011000010111000001101001")
 
-	Vres, _ := http.DefaultClient.Do(Vreq)
+	// Creating http timeout of 10 seconds for getting the response
+	client := &http.Client{Timeout: 10 * time.Second}
+	Vres, err := client.Do(Vreq)
+	if err != nil {
+		fmt.Println("Error:", err)
+	}
 
 	defer Vres.Body.Close()
 	// Read the full body into memory
@@ -169,7 +181,8 @@ func main() {
 		panic(err)
 	}
 	// Print the raw body
-	fmt.Println(string(body))
+	fmt.Println("Response body:")
+	fmt.Println(string(body) + "\n")
 
 	// Decode the JSON from the body bytes and get id
 	var obj Object
@@ -190,9 +203,9 @@ func main() {
 	req_p.Header.Add("accept", "application/json")
 	req_p.Header.Add("x-apikey", API_KEY)
 
-	res_p, err := http.DefaultClient.Do(req_p)
+	res_p, err := client.Do(req_p) // response for result also have timeout of 10 seconds
 	if err != nil {
-		panic(err)
+		fmt.Println("Error:", err)
 	}
 
 	defer res_p.Body.Close()
@@ -202,6 +215,20 @@ func main() {
 		panic(err)
 	}
 
-	fmt.Println(string(body_res))
+	fmt.Println("Analysis body:")
+	fmt.Println(string(body_res) + "\n")
 
+	// Decode the JSON from the body bytes and get id
+	var obj_res Object
+	if err := json.Unmarshal(body, &obj); err != nil {
+		panic(err)
+	}
+
+	result_mal := obj_res.Data.Stats.Malicious
+	result_sus := obj_res.Data.Stats.Suspicious
+	fmt.Printf("Malicious: %d,Suspicious: %d", result_mal, result_sus)
+
+	if result_mal > 0 || result_sus > 0 {
+		fmt.Println("Download failed, file is not safe.")
+	}
 }
