@@ -1,8 +1,8 @@
-async function sendDataToGo(id,url,filename,mime) {
+export async function sendDataToGo(id,url,filename,mime) {
         const data = {
             id: id,
-            url:url,
-            filename:filename,
+            url: url,
+            filename : filename,
             mime:mime
         };
 
@@ -16,10 +16,9 @@ async function sendDataToGo(id,url,filename,mime) {
             });
 
             const result = await response.text();
-            console.log(result); // should log: Data received successfully!
+            console.log("Go server response:", result); // should log: Data received successfully!
         } catch (error) {
             console.error('Error:', error);
         }
     }
 
-    sendDataToGo();
