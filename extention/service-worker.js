@@ -1,6 +1,5 @@
 import {sendDataToGo} from './send_to_go.js';
 
-
 chrome.downloads.onCreated.addListener(downloadItem => {
   console.log("New download started:");
   console.log("ID:", downloadItem.id);
@@ -9,5 +8,10 @@ chrome.downloads.onCreated.addListener(downloadItem => {
   console.log("Mime type:", downloadItem.mime);
 
   //send the data to golang server via the function
-  sendDataToGo(downloadItem.id,downloadItem.url,downloadItem.filename,downloadItem.mime)
+  sendDataToGo(
+    downloadItem.id,
+    downloadItem.url,
+    downloadItem.filename,
+    downloadItem.mime
+  );
 });
