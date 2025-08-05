@@ -1,5 +1,12 @@
 {
     "manifest_version":3,
     "name": "Downlod Scan",
-    "version": "1.0.0"
+    "version": "1.0.0",
+    
+    "permissions":[
+        "downloads"
+    ],
+    "background": {
+    "service_worker": "service-worker.js"
+  }
 }
