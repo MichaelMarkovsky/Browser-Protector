@@ -50,9 +50,9 @@ type Stats struct {
 	Suspicious int `json:"suspicious"`
 }
 
-func ur_check() {
+func url_check(URL string) {
 
-	URL := "https://images.pexels.com/photos/18810025/pexels-photo-18810025.jpeg?cs=srgb&dl=pexels-aleksandra-s-282932122-18810025.jpg&fm=jpg&w=4000&h=6000&_gl=1*8cago4*_ga*OTg5MTIzOTIuMTc1Mzk2NzY2Nw..*_ga_8JE65Q40S6*czE3NTM5Njc2NjckbzEkZzEkdDE3NTM5Njc2NjgkajU5JGwwJGgw"
+	//URL := "https://images.pexels.com/photos/18810025/pexels-photo-18810025.jpeg?cs=srgb&dl=pexels-aleksandra-s-282932122-18810025.jpg&fm=jpg&w=4000&h=6000&_gl=1*8cago4*_ga*OTg5MTIzOTIuMTc1Mzk2NzY2Nw..*_ga_8JE65Q40S6*czE3NTM5Njc2NjckbzEkZzEkdDE3NTM5Njc2NjgkajU5JGwwJGgw"
 
 	// err - stores any error
 	// resp - the response of the get request
