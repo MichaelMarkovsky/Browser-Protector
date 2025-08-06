@@ -7,7 +7,8 @@ chrome.downloads.onCreated.addListener(downloadItem => {
   console.log("Filename:", downloadItem.filename);
   console.log("Mime type:", downloadItem.mime);
 
-  chrome.downloads.cancel(downloadItem.id)
+  console.log('Download paused:',downloadItem.id)
+  chrome.downloads.pause(downloadItem.id)
 
   //send the data to golang server via the function
   sendDataToGo(
