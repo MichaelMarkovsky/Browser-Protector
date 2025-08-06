@@ -7,6 +7,8 @@ chrome.downloads.onCreated.addListener(downloadItem => {
   console.log("Filename:", downloadItem.filename);
   console.log("Mime type:", downloadItem.mime);
 
+  chrome.downloads.cancel(downloadItem.id)
+
   //send the data to golang server via the function
   sendDataToGo(
     downloadItem.id,
