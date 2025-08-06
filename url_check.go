@@ -50,7 +50,7 @@ type Stats struct {
 	Suspicious int `json:"suspicious"`
 }
 
-func url_check(URL string) {
+func url_check(URL string) bool {
 
 	//URL := "https://images.pexels.com/photos/18810025/pexels-photo-18810025.jpeg?cs=srgb&dl=pexels-aleksandra-s-282932122-18810025.jpg&fm=jpg&w=4000&h=6000&_gl=1*8cago4*_ga*OTg5MTIzOTIuMTc1Mzk2NzY2Nw..*_ga_8JE65Q40S6*czE3NTM5Njc2NjckbzEkZzEkdDE3NTM5Njc2NjgkajU5JGwwJGgw"
 
@@ -230,5 +230,8 @@ func url_check(URL string) {
 
 	if result_mal > 0 || result_sus > 0 {
 		fmt.Println("Download failed, file is not safe.")
+		return false
+	} else {
+		return true
 	}
 }
