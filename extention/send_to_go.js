@@ -15,10 +15,18 @@ export async function sendDataToGo(id,url,filename,mime) {
                 body: JSON.stringify(data)
             });
 
-            const result = await response.text();
-            console.log("Go server response:", result); // should log: Data received successfully!
-        } catch (error) {
-            console.error('Error:', error);
+            const result = await response.json(); // get { ok: true, status: "safe" }
+
+        console.log("Response from Go:", result);
+
+        if (result.ok && result.status === "safe") {
+            chrome.downloads.resume(id);
+        } else {
+            chrome.downloads.cancel(id);
+            alert("Malicious file blocked!");
         }
+    } catch (err) {
+        console.error("Error checking download:", err);
     }
+}
 
