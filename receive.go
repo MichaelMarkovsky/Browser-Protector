@@ -39,16 +39,21 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// if payload.FILENAME == "" {
-	// 	// Log to terminal
-	// 	fmt.Printf("Received id: %d, download_url: %s, mime: %s\n", payload.ID, payload.URL, payload.MIME)
-	// } else {
-	// 	// Log to terminal
-	// 	fmt.Printf("Received id: %d, download_url: %s, filename: %s, mime: %s\n", payload.ID, payload.URL, payload.FILENAME, payload.MIME)
-	// }
+	fmt.Println("Checking URL with VirusTotal...")
 
-	// Respond to client
-	fmt.Fprint(w, "Data received successfully!")
+	isSafe := url_check(payload.URL) // returns bool (true = safe, false = malicious)
+
+	status := "malicious"
+	if isSafe {
+		status = "safe"
+	}
+
+	// Respond with JSON
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"ok":     true,
+		"status": status,
+	})
 
 	dataChan <- payload
 }
