@@ -13,6 +13,9 @@ type DataPayload struct {
 	MIME     string `json:"mime"`
 }
 
+// a global channel to be used by handler
+var dataChan chan DataPayload
+
 func handler(w http.ResponseWriter, r *http.Request) {
 	// Allow requests from other origins (CORS)
 	w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -36,19 +39,22 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if payload.FILENAME == "" {
-		// Log to terminal
-		fmt.Printf("Received id: %d, download_url: %s, mime: %s\n", payload.ID, payload.URL, payload.MIME)
-	} else {
-		// Log to terminal
-		fmt.Printf("Received id: %d, download_url: %s, filename: %s, mime: %s\n", payload.ID, payload.URL, payload.FILENAME, payload.MIME)
-	}
+	// if payload.FILENAME == "" {
+	// 	// Log to terminal
+	// 	fmt.Printf("Received id: %d, download_url: %s, mime: %s\n", payload.ID, payload.URL, payload.MIME)
+	// } else {
+	// 	// Log to terminal
+	// 	fmt.Printf("Received id: %d, download_url: %s, filename: %s, mime: %s\n", payload.ID, payload.URL, payload.FILENAME, payload.MIME)
+	// }
 
 	// Respond to client
 	fmt.Fprint(w, "Data received successfully!")
+
+	dataChan <- payload
 }
 
-func receive() {
+func receive(c chan DataPayload) {
+	dataChan = c // assign channel so handler can use it
 	http.HandleFunc("/submit-data", handler)
 	fmt.Println("Server listening on :8080")
 	http.ListenAndServe(":8080", nil)
