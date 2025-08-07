@@ -27,10 +27,9 @@ func main() {
 
 	for {
 		payload := <-dataChan // blocks until data arrives
-		fmt.Println("")
-		fmt.Println("Main received:", payload)
+		fmt.Printf("The url %v has been successfully scanned.", payload.URL)
 
-		fmt.Printf("Received id: %d, download_url: %s, mime: %s\n", payload.ID, payload.URL, payload.MIME)
 		fmt.Println("")
 	}
+
 }

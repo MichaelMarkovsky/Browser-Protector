@@ -107,9 +107,9 @@ func url_check(URL string) bool {
 		// Create output file
 		out, err := os.Create(filename_path)
 		if err != nil {
+			out.Close()
 			log.Fatal("File creation failed:", err)
 		}
-		defer out.Close()
 
 		// Copy response body to file
 		n, err := io.Copy(out, resp.Body)
@@ -117,6 +117,9 @@ func url_check(URL string) bool {
 			log.Fatal("Copy failed:", err)
 		}
 		fmt.Printf("Downloaded %d bytes\n", n)
+
+		out.Sync()
+		out.Close()
 	} else {
 		log.Fatal("File name has not been located, download failed.")
 	}
@@ -128,12 +131,13 @@ func url_check(URL string) bool {
 		if err != nil {
 			panic(err)
 		}
-		defer a.Close()
 
 		_, err = a.Extract("./temp")
 		if err != nil {
+			a.Close()
 			panic(err)
 		}
+		a.Close()
 
 	}
 
@@ -228,6 +232,29 @@ func url_check(URL string) bool {
 	result_mal := obj_res.Data.Stats.Malicious
 	result_sus := obj_res.Data.Stats.Suspicious
 	fmt.Printf("Malicious: %d,Suspicious: %d", result_mal, result_sus)
+
+	//================= Delete files ==============
+	// Delete the file
+	fmt.Println("")
+	err = os.RemoveAll(filename_path)
+	if err != nil {
+		log.Fatalf("Error deleting file: %v", err)
+	}
+	log.Printf("File '%s' deleted successfully.", filename_path)
+
+	if IsCompressed {
+		// get the name of the folder
+		if idx := strings.LastIndex(filename_path, "."); idx != -1 {
+			filename_path = filename_path[:idx]
+		}
+
+		err = os.RemoveAll(filename_path)
+		if err != nil {
+			log.Fatalf("Error deleting file: %v", err)
+		}
+		log.Printf("Compressed file '%s' deleted successfully.", filename_path)
+	}
+	//=============================================
 
 	if result_mal > 0 || result_sus > 0 {
 		fmt.Println("Download failed, file is not safe.")
