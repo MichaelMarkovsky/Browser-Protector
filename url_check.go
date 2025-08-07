@@ -126,19 +126,27 @@ func url_check(URL string) bool {
 
 	// If the file is of zip type then unzip (if its compressed then uncompress)
 	if IsCompressed {
-
 		a, err := unarr.NewArchive(filename_path)
 		if err != nil {
 			panic(err)
 		}
 
-		_, err = a.Extract("./temp")
+		// ensure destination folder exists
+		dest := "./temp/uncompressed"
+		err = os.MkdirAll(dest, os.ModePerm)
 		if err != nil {
 			a.Close()
 			panic(err)
 		}
-		a.Close()
 
+		// extract to the uncompressed folder
+		_, err = a.Extract(dest)
+		if err != nil {
+			a.Close()
+			panic(err)
+		}
+
+		a.Close()
 	}
 
 	// godotenv package
@@ -236,24 +244,11 @@ func url_check(URL string) bool {
 	//================= Delete files ==============
 	// Delete the file
 	fmt.Println("")
-	err = os.RemoveAll(filename_path)
+	err = os.RemoveAll("./temp")
 	if err != nil {
-		log.Fatalf("Error deleting file: %v", err)
+		log.Fatalf("Error deleting temp: %v", err)
 	}
-	log.Printf("File '%s' deleted successfully.", filename_path)
-
-	if IsCompressed {
-		// get the name of the folder
-		if idx := strings.LastIndex(filename_path, "."); idx != -1 {
-			filename_path = filename_path[:idx]
-		}
-
-		err = os.RemoveAll(filename_path)
-		if err != nil {
-			log.Fatalf("Error deleting file: %v", err)
-		}
-		log.Printf("Compressed file '%s' deleted successfully.", filename_path)
-	}
+	log.Printf("temp folder has been deleted successfully.")
 	//=============================================
 
 	if result_mal > 0 || result_sus > 0 {
