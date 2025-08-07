@@ -2,9 +2,19 @@ package main
 
 import (
 	"fmt"
+	"os"
 )
 
 func main() {
+	dirPath := "./temp" // Path to the directory to create
+
+	// Create the directory and any necessary parent directories
+	err := os.MkdirAll(dirPath, 0755) // 0755 sets the permissions for the new directory
+	if err != nil {
+		fmt.Printf("Error creating directory: %v\n", err)
+		return
+	}
+	fmt.Printf("Directory '%s' created or already exists.\n", dirPath)
 
 	// create channel to receive data
 	dataChan := make(chan DataPayload)

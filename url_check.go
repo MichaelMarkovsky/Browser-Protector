@@ -102,9 +102,10 @@ func url_check(URL string) bool {
 	}
 
 	//If we found a name for the file then create and download the file
+	filename_path := "./temp/" + filename
 	if filename != "" {
 		// Create output file
-		out, err := os.Create(filename)
+		out, err := os.Create(filename_path)
 		if err != nil {
 			log.Fatal("File creation failed:", err)
 		}
@@ -123,13 +124,13 @@ func url_check(URL string) bool {
 	// If the file is of zip type then unzip (if its compressed then uncompress)
 	if IsCompressed {
 
-		a, err := unarr.NewArchive(filename)
+		a, err := unarr.NewArchive(filename_path)
 		if err != nil {
 			panic(err)
 		}
 		defer a.Close()
 
-		_, err = a.Extract("./")
+		_, err = a.Extract("./temp")
 		if err != nil {
 			panic(err)
 		}
@@ -142,7 +143,7 @@ func url_check(URL string) bool {
 	//===================================== SEND FILE TO VIRUS TOTAL =====================================
 	Vurl := "https://www.virustotal.com/api/v3/files"
 
-	fileBytes, err := os.ReadFile(filename)
+	fileBytes, err := os.ReadFile(filename_path)
 	if err != nil {
 		panic(err)
 	}
