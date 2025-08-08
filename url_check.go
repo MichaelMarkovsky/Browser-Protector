@@ -38,9 +38,9 @@ type Object struct {
 }
 
 type Data struct {
-	ID    string `json:"id"`
-	Links Links  `json:"links"`
-	Stats Stats  `json:"stats"`
+	ID         string     `json:"id"`
+	Links      Links      `json:"links"`
+	StatusInfo Attributes `json:"attributes"`
 }
 type Links struct {
 	Self string `json:"self"`
@@ -50,7 +50,20 @@ type Stats struct {
 	Suspicious int `json:"suspicious"`
 }
 
+type Attributes struct {
+	Status string `json:"status"`
+	Stats  Stats  `json:"stats"`
+}
+
 func url_check(URL string) bool {
+	dirPath := "./temp" // Path to the directory to create
+
+	// Create the directory and any necessary parent directories
+	err := os.MkdirAll(dirPath, 0755) // 0755 sets the permissions for the new directory
+	if err != nil {
+		fmt.Printf("Error creating directory: %v\n", err)
+	}
+	fmt.Printf("Directory '%s' created or already exists.\n", dirPath)
 
 	//URL := "https://images.pexels.com/photos/18810025/pexels-photo-18810025.jpeg?cs=srgb&dl=pexels-aleksandra-s-282932122-18810025.jpg&fm=jpg&w=4000&h=6000&_gl=1*8cago4*_ga*OTg5MTIzOTIuMTc1Mzk2NzY2Nw..*_ga_8JE65Q40S6*czE3NTM5Njc2NjckbzEkZzEkdDE3NTM5Njc2NjgkajU5JGwwJGgw"
 
@@ -147,6 +160,8 @@ func url_check(URL string) bool {
 		}
 
 		a.Close()
+
+		filename_path = "./temp/uncompressed/"
 	}
 
 	// godotenv package
@@ -207,38 +222,45 @@ func url_check(URL string) bool {
 	fmt.Println("Analysis url id: " + url_id)
 
 	//=====================================GET Virus Total analysis on the file/folder=====================================
-
-	req_p, err := http.NewRequest("GET", url_id, nil)
-	if err != nil {
-		panic(err)
-	}
-
-	req_p.Header.Add("accept", "application/json")
-	req_p.Header.Add("x-apikey", API_KEY)
-
-	res_p, err := client.Do(req_p) // response for result also have timeout of 10 seconds
-	if err != nil {
-		fmt.Println("Error:", err)
-	}
-
-	defer res_p.Body.Close()
-
-	body_res, err := io.ReadAll(res_p.Body)
-	if err != nil {
-		panic(err)
-	}
-
-	fmt.Println("Analysis body:")
-	fmt.Println(string(body_res) + "\n")
-
-	// Decode the JSON from the body bytes and get id
 	var obj_res Object
-	if err := json.Unmarshal(body, &obj); err != nil {
-		panic(err)
+	for i := 0; i < 10; i++ {
+		req_p, err := http.NewRequest("GET", url_id, nil)
+		if err != nil {
+			panic(err)
+		}
+
+		req_p.Header.Add("accept", "application/json")
+		req_p.Header.Add("x-apikey", API_KEY)
+
+		res_p, err := client.Do(req_p) // response for result also have timeout of 10 seconds
+		if err != nil {
+			fmt.Println("Error:", err)
+		}
+
+		defer res_p.Body.Close()
+
+		body_res, err := io.ReadAll(res_p.Body)
+		if err != nil {
+			panic(err)
+		}
+
+		fmt.Println("Analysis body:")
+		fmt.Println(string(body_res) + "\n")
+
+		// Decode the JSON from the body bytes and get id
+
+		if err := json.Unmarshal(body_res, &obj_res); err != nil {
+			panic(err)
+		}
+
+		if obj_res.Data.StatusInfo.Status == "completed" {
+			break
+		}
+		time.Sleep(5 * time.Second) // wait before next poll
 	}
 
-	result_mal := obj_res.Data.Stats.Malicious
-	result_sus := obj_res.Data.Stats.Suspicious
+	result_mal := obj_res.Data.StatusInfo.Stats.Malicious
+	result_sus := obj_res.Data.StatusInfo.Stats.Suspicious
 	fmt.Printf("Malicious: %d,Suspicious: %d", result_mal, result_sus)
 
 	//================= Delete files ==============
