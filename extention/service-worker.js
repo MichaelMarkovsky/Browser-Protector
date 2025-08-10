@@ -10,11 +10,24 @@ chrome.downloads.onCreated.addListener(downloadItem => {
   console.log('Download paused:',downloadItem.id)
   chrome.downloads.pause(downloadItem.id)
 
-  //send the data to golang server via the function
-  sendDataToGo(
-    downloadItem.id,
-    downloadItem.url,
-    downloadItem.filename,
-    downloadItem.mime
-  );
+   // wait for the filename to be available
+  // wait for the filename to be available
+  const listener = delta => {
+    if (delta.id === downloadItem.id && delta.filename && delta.filename.current) {
+      const nameOnly = delta.filename.current.split(/[\\/]/).pop();
+      console.log("Final filename:", nameOnly);
+
+      // send the data to golang server
+      sendDataToGo(
+        downloadItem.id,
+        downloadItem.url,
+        nameOnly,
+        downloadItem.mime
+      );
+
+      // stop listening for this download
+      chrome.downloads.onChanged.removeListener(listener);
+    }
+  };
+  chrome.downloads.onChanged.addListener(listener);
 });
