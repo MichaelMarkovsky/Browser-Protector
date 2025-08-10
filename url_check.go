@@ -1,16 +1,15 @@
 package main
 
 import (
-	"encoding/base64"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
-	"mime"
+	"mime/multipart"
 	"net/http"
-	"net/url"
 	"os"
-	"path"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -55,17 +54,22 @@ type Attributes struct {
 	Stats  Stats  `json:"stats"`
 }
 
-func url_check(URL string) bool {
-	dirPath := "./temp" // Path to the directory to create
-
+func mustMkdir(path string) {
 	// Create the directory and any necessary parent directories
-	err := os.MkdirAll(dirPath, 0755) // 0755 sets the permissions for the new directory
-	if err != nil {
-		fmt.Printf("Error creating directory: %v\n", err)
+	if err := os.MkdirAll(path, 0o755); err != nil {
+		log.Fatal(err)
 	}
-	fmt.Printf("Directory '%s' created or already exists.\n", dirPath)
+}
 
-	//URL := "https://images.pexels.com/photos/18810025/pexels-photo-18810025.jpeg?cs=srgb&dl=pexels-aleksandra-s-282932122-18810025.jpg&fm=jpg&w=4000&h=6000&_gl=1*8cago4*_ga*OTg5MTIzOTIuMTc1Mzk2NzY2Nw..*_ga_8JE65Q40S6*czE3NTM5Njc2NjckbzEkZzEkdDE3NTM5Njc2NjgkajU5JGwwJGgw"
+func url_check(URL string, FILENAME string) bool {
+	temp := "./temp" // Path to the directory to create
+	uncompressed := "./temp/uncompressed"
+	compressed := "./temp/compressed"
+
+	// ensure dirs exist
+	mustMkdir(temp)
+	mustMkdir(uncompressed)
+	mustMkdir(compressed)
 
 	// err - stores any error
 	// resp - the response of the get request
@@ -96,26 +100,35 @@ func url_check(URL string) bool {
 	}
 
 	// Get the file name
-	filename := ""
-	// Try to extract the filename from disposition (if a file is meant to be downloaded it most likey has a 'Content-Dosposition' section in the header)
-	disposition, params, err := mime.ParseMediaType(resp.Header.Get("Content-Disposition"))
-	fmt.Println(disposition)
-	if err != nil {
-		// If the file has no disposition section, the file could have the name from the url itself, extracting from the url
-		fmt.Println("There is no disposition in the header,\nUsing the name from the url parsed:")
+	// filename := ""
+	// // Try to extract the filename from disposition (if a file is meant to be downloaded it most likey has a 'Content-Dosposition' section in the header)
+	// disposition, params, err := mime.ParseMediaType(resp.Header.Get("Content-Disposition"))
+	// fmt.Println(disposition)
+	// if err != nil {
+	// 	// If the file has no disposition section, the file could have the name from the url itself, extracting from the url
+	// 	fmt.Println("There is no disposition in the header,\nUsing the name from the url parsed:")
 
-		u, _ := url.Parse(URL)
-		cleanPath := u.Path
-		filename = path.Base(cleanPath)
-		fmt.Println("filename:", filename)
+	// 	u, _ := url.Parse(URL)
+	// 	cleanPath := u.Path
+	// 	filename = path.Base(cleanPath)
+	// 	fmt.Println("filename:", filename)
 
+	// } else {
+	// 	filename = params["filename"]
+	// 	fmt.Println("filename:", filename)
+	// }
+
+	filename := FILENAME
+
+	filename_path := ""
+	if IsCompressed {
+		filename_path = "./temp/compressed/" + filename
 	} else {
-		filename = params["filename"]
-		fmt.Println("filename:", filename)
+		filename_path = "./temp/uncompressed/" + filename
 	}
 
 	//If we found a name for the file then create and download the file
-	filename_path := "./temp/" + filename
+
 	if filename != "" {
 		// Create output file
 		out, err := os.Create(filename_path)
@@ -167,116 +180,186 @@ func url_check(URL string) bool {
 	// godotenv package
 	API_KEY := goDotEnvVariable("API_KEY")
 
+	//===================================== GET ALL FILE PATHS ==========================================
+	//Get list of file's path's , to then send and get easily their IDs to then upload, meaning its going to work on nested folders.
+	var File_Paths = []string{}
+
+	rootPath := "./temp/uncompressed"
+
+	//walk recursivly in the temp folder to find all the paths for all the files
+	err = filepath.Walk(rootPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err // Handle any errors encountered during traversal
+		}
+		if !info.IsDir() { // Check if it's a file (not a directory)
+			fmt.Println("File to upload: ", path) // Print the path of the file
+			File_Paths = append(File_Paths, path)
+		}
+		return nil // Continue walking the tree
+	})
+
+	if err != nil {
+		log.Fatal(err) // Handle errors from filepath.Walk itself
+	}
+
 	//===================================== SEND FILE TO VIRUS TOTAL =====================================
-	Vurl := "https://www.virustotal.com/api/v3/files"
+	var IDs []string
 
-	fileBytes, err := os.ReadFile(filename_path)
-	if err != nil {
-		panic(err)
-	}
-
-	// Encode file to base64
-	fileBase64 := base64.StdEncoding.EncodeToString(fileBytes)
-
-	// Define boundary
-	boundary := "-----011000010111000001101001"
-
-	// Create multipart form body as string
-	payloadStr := fmt.Sprintf(
-		"%s\r\nContent-Disposition: form-data; name=\"file\"; filename=\"%s\"\r\nContent-Type: %s\r\n\r\n"+
-			"data:%s;name=%s;base64,%s\r\n%s--",
-		boundary, filename, contentType, contentType, filename, fileBase64, boundary)
-
-	payload := strings.NewReader(payloadStr)
-
-	Vreq, _ := http.NewRequest("POST", Vurl, payload)
-
-	Vreq.Header.Add("accept", "application/json")
-	Vreq.Header.Add("x-apikey", API_KEY)
-	Vreq.Header.Add("content-type", "multipart/form-data; boundary=---011000010111000001101001")
-
-	// Creating http timeout of 10 seconds for getting the response
 	client := &http.Client{Timeout: 10 * time.Second}
-	Vres, err := client.Do(Vreq)
-	if err != nil {
-		fmt.Println("Error:", err)
-	}
 
-	defer Vres.Body.Close()
-	// Read the full body into memory
-	body, err := io.ReadAll(Vres.Body)
-	if err != nil {
-		panic(err)
-	}
-	// Print the raw body
-	fmt.Println("Response body:")
-	fmt.Println(string(body) + "\n")
+	// 1 request every 15 seconds , 4/min
+	limiter := time.NewTicker(15 * time.Second)
+	defer limiter.Stop()
 
-	// Decode the JSON from the body bytes and get id
-	var obj Object
-	if err := json.Unmarshal(body, &obj); err != nil {
-		panic(err)
-	}
+	for _, path := range File_Paths {
+		<-limiter.C // wait before sending next request
 
-	url_id := obj.Data.Links.Self
-	fmt.Println("Analysis url id: " + url_id)
+		fileName := filepath.Base(path)
+
+		// open file for reading
+		f, err := os.Open(path)
+		if err != nil {
+			fmt.Println("error opening file:", err)
+			continue
+		}
+
+		// build proper multipart form with raw file bytes
+		var buf bytes.Buffer
+		mw := multipart.NewWriter(&buf)
+		fw, err := mw.CreateFormFile("file", fileName)
+		if err != nil {
+			fmt.Println("error creating form file:", err)
+			f.Close()
+			continue
+		}
+		if _, err := io.Copy(fw, f); err != nil {
+			fmt.Println("error copying file contents:", err)
+			f.Close()
+			continue
+		}
+		f.Close()
+		mw.Close()
+
+		req, err := http.NewRequest("POST", "https://www.virustotal.com/api/v3/files", &buf)
+		if err != nil {
+			fmt.Println("error creating request:", err)
+			continue
+		}
+
+		req.Header.Set("accept", "application/json")
+		req.Header.Set("x-apikey", API_KEY)
+		req.Header.Set("content-type", mw.FormDataContentType())
+
+		res, err := client.Do(req)
+		if err != nil {
+			fmt.Println("error sending request:", err)
+			continue
+		}
+
+		body, err := io.ReadAll(res.Body)
+		res.Body.Close()
+		if err != nil {
+			fmt.Println("error reading response:", err)
+			continue
+		}
+
+		// fmt.Println("response body:")
+		// fmt.Println(string(body), "\n")
+
+		var obj Object
+		if err := json.Unmarshal(body, &obj); err != nil {
+			fmt.Println("error decoding json:", err)
+			continue
+		}
+
+		urlID := obj.Data.Links.Self
+		fmt.Println("Analysis url id:", urlID)
+		IDs = append(IDs, urlID)
+	}
 
 	//=====================================GET Virus Total analysis on the file/folder=====================================
-	var obj_res Object
-	for i := 0; i < 10; i++ {
-		req_p, err := http.NewRequest("GET", url_id, nil)
-		if err != nil {
-			panic(err)
+	safe := true
+
+	pollLimiter := time.NewTicker(3 * time.Second) // 1 poll every 3s
+	defer pollLimiter.Stop()
+
+	for _, urlID := range IDs { // loop over all collected analysis URLs
+		var obj_res Object
+
+		completed := false
+
+		for i := 0; i < 10; i++ {
+			<-pollLimiter.C // wait for allowed slot before each GET
+
+			req_p, err := http.NewRequest("GET", urlID, nil)
+			if err != nil {
+				fmt.Println("error creating request:", err)
+				break
+			}
+
+			req_p.Header.Add("accept", "application/json")
+			req_p.Header.Add("x-apikey", API_KEY)
+
+			res_p, err := client.Do(req_p)
+			if err != nil {
+				fmt.Println("error sending request:", err)
+				break
+			}
+
+			body_res, err := io.ReadAll(res_p.Body)
+			res_p.Body.Close()
+			if err != nil {
+				fmt.Println("error reading body:", err)
+				break
+			}
+
+			// fmt.Println("Analysis body:")
+			// fmt.Println(string(body_res), "\n")
+
+			if err := json.Unmarshal(body_res, &obj_res); err != nil {
+				fmt.Println("error decoding json:", err)
+				break
+			}
+
+			if obj_res.Data.StatusInfo.Status == "completed" {
+				result_mal := obj_res.Data.StatusInfo.Stats.Malicious
+				result_sus := obj_res.Data.StatusInfo.Stats.Suspicious
+				fmt.Printf("File %s | Malicious: %d, Suspicious: %d\n", urlID, result_mal, result_sus)
+				if result_mal > 0 || result_sus > 0 {
+					safe = false
+				}
+				completed = true
+				break
+			}
+
+			time.Sleep(5 * time.Second) // wait before next poll
 		}
-
-		req_p.Header.Add("accept", "application/json")
-		req_p.Header.Add("x-apikey", API_KEY)
-
-		res_p, err := client.Do(req_p) // response for result also have timeout of 10 seconds
-		if err != nil {
-			fmt.Println("Error:", err)
+		if !completed {
+			fmt.Printf("warning: analysis did not complete for %s, marking as unsafe\n", urlID)
+			safe = false
 		}
-
-		defer res_p.Body.Close()
-
-		body_res, err := io.ReadAll(res_p.Body)
-		if err != nil {
-			panic(err)
-		}
-
-		fmt.Println("Analysis body:")
-		fmt.Println(string(body_res) + "\n")
-
-		// Decode the JSON from the body bytes and get id
-
-		if err := json.Unmarshal(body_res, &obj_res); err != nil {
-			panic(err)
-		}
-
-		if obj_res.Data.StatusInfo.Status == "completed" {
-			break
-		}
-		time.Sleep(5 * time.Second) // wait before next poll
 	}
-
-	result_mal := obj_res.Data.StatusInfo.Stats.Malicious
-	result_sus := obj_res.Data.StatusInfo.Stats.Suspicious
-	fmt.Printf("Malicious: %d,Suspicious: %d", result_mal, result_sus)
 
 	//================= Delete files ==============
 	// Delete the file
 	fmt.Println("")
-	err = os.RemoveAll("./temp")
-	if err != nil {
-		log.Fatalf("Error deleting temp: %v", err)
+
+	// list of folders to nuke
+	folders := []string{"./temp/compressed", "./temp/uncompressed", "./temp"}
+
+	for _, folder := range folders {
+		if err := os.RemoveAll(folder); err != nil {
+			log.Fatalf("error deleting %s: %v", folder, err)
+		}
+		log.Printf("%s folder has been deleted successfully.", folder)
 	}
-	log.Printf("temp folder has been deleted successfully.")
 	//=============================================
 
-	if result_mal > 0 || result_sus > 0 {
-		fmt.Println("Download failed, file is not safe.")
+	if !safe {
+		fmt.Println("Download failed, on or more files are not safe.")
 		return false
 	} else {
+		fmt.Println("Download is safe and was successful.")
 		return true
 	}
 }
