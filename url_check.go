@@ -61,7 +61,7 @@ func mustMkdir(path string) {
 	}
 }
 
-func url_check(URL string, FILENAME string) bool {
+func url_check(URL string, FILENAME string, MIME string) bool {
 	temp := "./temp" // Path to the directory to create
 	uncompressed := "./temp/uncompressed"
 	compressed := "./temp/compressed"
@@ -86,7 +86,8 @@ func url_check(URL string, FILENAME string) bool {
 	}
 
 	// Check content-type (whether its an image or zip file)
-	contentType := resp.Header.Get("Content-Type")
+	// contentType := resp.Header.Get("Content-Type")
+	contentType := MIME
 	fmt.Println("Content-Type:", contentType)
 
 	compressedTypes := []string{"zip", "rar", "tar", "7z"}
