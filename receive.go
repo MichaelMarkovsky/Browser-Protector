@@ -41,7 +41,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Println("Checking URL with VirusTotal...")
 
-	isSafe := url_check(payload.URL) // returns bool (true = safe, false = malicious)
+	isSafe := url_check(payload.URL, payload.FILENAME) // returns bool (true = safe, false = malicious)
 
 	status := "malicious"
 	if isSafe {
