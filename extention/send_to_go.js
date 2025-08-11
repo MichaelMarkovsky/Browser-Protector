@@ -23,7 +23,7 @@ export async function sendDataToGo(id,url,filename,mime) {
             chrome.downloads.resume(id);
         } else {
             chrome.downloads.cancel(id);
-            alert("Malicious file blocked!");
+            console.log("File is malicious");
         }
     } catch (err) {
         console.error("Error checking download:", err);
