@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 )
@@ -29,7 +30,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 
-	// For preflight OPTIONS requests (browser does this sometimes)
+	// For preflight OPTIONS requests
 	if r.Method == http.MethodOptions {
 		w.WriteHeader(http.StatusOK)
 		return
@@ -41,8 +42,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var payload DataPayload
-	err := json.NewDecoder(r.Body).Decode(&payload)
-	if err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 		fmt.Printf("Error decoding payload: %v\n", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -50,7 +50,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Printf("Checking URL with VirusTotal: %s, Filename: %s, MIME: %s\n", payload.URL, payload.FILENAME, payload.MIME)
 
-	// url_check now returns (bool, proxyURL)
+	// url_check returns (isSafe, proxyURL)
 	isSafe, proxyURL := url_check(payload.URL, payload.FILENAME, payload.MIME)
 	fmt.Printf("VirusTotal result for URL %s isSafe: %v\n", payload.URL, isSafe)
 
@@ -67,12 +67,15 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	dataChan <- payload
 }
 
-// serveOnce serves a file exactly once, then forgets it
+// serveOnce serves a file exactly once, then forgets it and cleans temp
 func serveOnce(w http.ResponseWriter, r *http.Request) {
+	// (Optional) CORS for GETs too
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
 	token := strings.TrimPrefix(r.URL.Path, "/safe/")
 
 	safeFiles.mu.Lock()
-	path, ok := safeFiles.m[token]
+	p, ok := safeFiles.m[token]
 	if ok {
 		delete(safeFiles.m, token) // one-shot
 	}
@@ -83,22 +86,35 @@ func serveOnce(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Set a download header
-	attach := `attachment; filename="` + fileBase(path) + `"`
-	w.Header().Set("Content-Disposition", attach)
+	// set a download header
+	w.Header().Set("Content-Disposition", `attachment; filename="`+fileBase(p)+`"`)
 
-	http.ServeFile(w, r, path)
+	// open -> serve -> close (ensures Windows releases the handle)
+	f, err := os.Open(p)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	fi, _ := f.Stat()
+	http.ServeContent(w, r, fileBase(p), fi.ModTime(), f)
+	_ = f.Close()
 
-	// remove after serving
-	_ = safeRemove(path)
-	// clean parent temp dirs if empty
-	cleanEmpties(path)
+	// remove the served file
+	_ = safeRemove(p)
+
+	// remove empty parents up to ./temp
+	cleanEmpties(p)
+
+	// best-effort: try removing the temp roots if now empty
+	_ = os.Remove("./temp/uncompressed")
+	_ = os.Remove("./temp/compressed")
+	_ = os.Remove("./temp")
 }
 
 func receive(c chan DataPayload) {
 	dataChan = c
 	http.HandleFunc("/submit-data", handler)
-	http.HandleFunc("/safe/", serveOnce) // new endpoint that serves the already-downloaded file
+	http.HandleFunc("/safe/", serveOnce) // serves the already-downloaded file once
 
 	fmt.Println("Server listening on :8080")
 	http.ListenAndServe(":8080", nil)
