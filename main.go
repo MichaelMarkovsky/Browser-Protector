@@ -1,3 +1,4 @@
+// main.go
 package main
 
 import (
@@ -17,8 +18,6 @@ func main() {
 	for {
 		payload := <-dataChan // blocks until data arrives
 		fmt.Printf("The url %v has been successfully scanned.", payload.URL)
-
 		fmt.Println("")
 	}
-
 }

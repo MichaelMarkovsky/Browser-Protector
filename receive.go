@@ -1,10 +1,19 @@
+// receive.go
 package main
 
 import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
+	"sync"
 )
+
+// file path to serve once
+var safeFiles = struct {
+	m  map[string]string
+	mu sync.Mutex
+}{m: make(map[string]string)}
 
 type DataPayload struct {
 	ID       int    `json:"id"`
@@ -13,7 +22,6 @@ type DataPayload struct {
 	MIME     string `json:"mime"`
 }
 
-// a global channel to be used by handler
 var dataChan chan DataPayload
 
 func handler(w http.ResponseWriter, r *http.Request) {
@@ -35,32 +43,63 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	var payload DataPayload
 	err := json.NewDecoder(r.Body).Decode(&payload)
 	if err != nil {
+		fmt.Printf("Error decoding payload: %v\n", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	fmt.Println("Checking URL with VirusTotal...")
+	fmt.Printf("Checking URL with VirusTotal: %s, Filename: %s, MIME: %s\n", payload.URL, payload.FILENAME, payload.MIME)
 
-	isSafe := url_check(payload.URL, payload.FILENAME, payload.MIME) // returns bool (true = safe, false = malicious)
+	// url_check now returns (bool, proxyURL)
+	isSafe, proxyURL := url_check(payload.URL, payload.FILENAME, payload.MIME)
+	fmt.Printf("VirusTotal result for URL %s isSafe: %v\n", payload.URL, isSafe)
 
-	status := "malicious"
-	if isSafe {
-		status = "safe"
+	w.Header().Set("Content-Type", "application/json")
+	resp := map[string]any{
+		"isSafe":   isSafe,
+		"proxyUrl": proxyURL, // empty when unsafe
+	}
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		fmt.Printf("Error encoding response for URL %s: %v\n", payload.URL, err)
 	}
 
-	// Respond with JSON
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"ok":     true,
-		"status": status,
-	})
-
+	// push to channel after responding
 	dataChan <- payload
 }
 
+// serveOnce serves a file exactly once, then forgets it
+func serveOnce(w http.ResponseWriter, r *http.Request) {
+	token := strings.TrimPrefix(r.URL.Path, "/safe/")
+
+	safeFiles.mu.Lock()
+	path, ok := safeFiles.m[token]
+	if ok {
+		delete(safeFiles.m, token) // one-shot
+	}
+	safeFiles.mu.Unlock()
+
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+
+	// Set a download header
+	attach := `attachment; filename="` + fileBase(path) + `"`
+	w.Header().Set("Content-Disposition", attach)
+
+	http.ServeFile(w, r, path)
+
+	// remove after serving
+	_ = safeRemove(path)
+	// clean parent temp dirs if empty
+	cleanEmpties(path)
+}
+
 func receive(c chan DataPayload) {
-	dataChan = c // assign channel so handler can use it
+	dataChan = c
 	http.HandleFunc("/submit-data", handler)
+	http.HandleFunc("/safe/", serveOnce) // new endpoint that serves the already-downloaded file
+
 	fmt.Println("Server listening on :8080")
 	http.ListenAndServe(":8080", nil)
 }

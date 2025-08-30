@@ -4,7 +4,9 @@
     "version": "1.0.0",
     
     "permissions":[
-        "downloads"
+        "downloads",
+        "notifications",
+        "http://localhost:8080/*"
     ],
     "background": {
     "service_worker": "service-worker.js",
