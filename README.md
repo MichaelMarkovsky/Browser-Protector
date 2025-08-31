@@ -1,8 +1,7 @@
 # Chrome Donwload's Scanner 
 
 >A Go backend + Chrome extension that ensures files are only downloaded **after being scanned by VirusTotal**.
-
-<img width="417" height="220" alt="Screenshot 2025-08-30 155000" src="https://github.com/user-attachments/assets/d3cc6611-461d-401a-b8e9-73c82f3c0136" />
+<img width="1844" height="994" alt="Screenshot_20250831_174753" src="https://github.com/user-attachments/assets/a3f0c921-a6f8-4c66-9efd-0643d50d78c7" />
 
 ## Features
 - Cancels the **original browser download** and instead saves the file into a temp folder for scanning - improving security by ensuring files never reach the user unverified.  
